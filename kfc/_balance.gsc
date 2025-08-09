@@ -4,66 +4,88 @@
 
 init()
 {
-    // Initialize balance monitoring
-    [[level.on]]("spawned", ::BalanceTeams);
+    // Ejecutar BalanceTeams cuando un jugador spawnea
+    level on("spawned", ::BalanceTeams);
 }
 
 BalanceTeams()
 {
-    // End conditions for balance monitoring
+    // Finaliza el hilo si hay votación o termina el juego
     level endon("vote started");
     level endon("game_ended");
 
-    // Variables to keep track of team balances
-    int team1Count = 0;
-    int team2Count = 0;
-
     while (true)
     {
-        wait 10;  // Adjust the interval as needed
+        wait 10; // Esperar 10 segundos entre chequeos
 
-        // Count the number of players in each team
-        team1Count = countPlayersInTeam("team1");
-        team2Count = countPlayersInTeam("team2");
+        int team1Count = countPlayersInTeam("axis");   // Cambia "axis" y "allies" según tus equipos
+        int team2Count = countPlayersInTeam("allies");
 
-        // Balance teams if needed
         if (team1Count > team2Count + 1)
         {
-            // Move a player from team1 to team2
-            player = getPlayerFromTeam("team1");
-            if (player)
+            player p = getPlayerFromTeam("axis");
+            if (p)
             {
-                movePlayerToTeam(player, "team2");
-                iPrintln(player.name + " has been moved to team2 to balance teams.");
+                movePlayerToTeam(p, "allies");
+                iPrintln(p.name + " has been moved to allies to balance teams.");
             }
         }
         else if (team2Count > team1Count + 1)
         {
-            // Move a player from team2 to team1
-            player = getPlayerFromTeam("team2");
-            if (player)
+            player p = getPlayerFromTeam("allies");
+            if (p)
             {
-                movePlayerToTeam(player, "team1");
-                iPrintln(player.name + " has been moved to team1 to balance teams.");
+                movePlayerToTeam(p, "axis");
+                iPrintln(p.name + " has been moved to axis to balance teams.");
             }
         }
     }
 }
 
-// Helper functions
+// Cuenta jugadores vivos en un equipo que no sean espectadores
 int countPlayersInTeam(string team)
 {
-    // Implement this function to count the number of players in the specified team
-    return 0;  // Placeholder
+    player[] players = getPlayers();
+    int count = 0;
+    for (int i = 0; i < players.size; i++)
+    {
+        if (players[i].team == team && players[i].sessionteam != "spectator" && isAlive(players[i]))
+            count++;
+    }
+    return count;
 }
 
+// Obtiene un jugador válido para mover (no admin, no AFK, etc)
 player getPlayerFromTeam(string team)
 {
-    // Implement this function to get a player from the specified team
-    return null;  // Placeholder
+    player[] players = getPlayers();
+    for (int i = 0; i < players.size; i++)
+    {
+        player p = players[i];
+        if (p.team == team && p.sessionteam != "spectator" && isAlive(p))
+        {
+            // Aquí puedes agregar más filtros, por ejemplo no mover admins o jugadores AFK
+            if (!isDefined(p.isAdmin) || !p.isAdmin) 
+                return p;
+        }
+    }
+    return null;
 }
 
-void movePlayerToTeam(player, string team)
+// Cambia el equipo del jugador y lo hace respawnear
+void movePlayerToTeam(player p, string newTeam)
 {
-    // Implement this function to move the specified player to the specified team
+    if (!isDefined(p))
+        return;
+
+    // Forzar respawn para evitar bugs
+    p suicide();
+
+    p setTeam(newTeam);
+
+    // Respawnear al jugador
+    p thread maps\mp\gametypes\_globallogic::spawnPlayer();
+
+    // Mensaje privado al jugador
+    p iprintlnbold("^2You were moved to " + newTeam + " to balance teams.");
 }
